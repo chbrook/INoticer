@@ -2,20 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:get/get.dart';
 import 'package:http2/http2.dart';
-import 'package:inoticer/controller/config_controller.dart';
-import 'package:inoticer/utils/storage.dart';
+import 'package:inoticer/utils/prefs.dart';
+
+const keyId = 'LH4T9V5U4R';
+const teamId = '5U8LBRXG3A';
+const bundleId = 'me.fin.bark';
 
 Future<String> getToken() async {
-  String keyId = 'LH4T9V5U4R';
-  String teamId = '5U8LBRXG3A';
+  //get token from cache
+  final cachedToken = await prefs.getString('apns_token');
+  final cachedTimestamp = await prefs.getInt('apns_token_timestamp');
 
-  // 检查缓存的token
-  final cachedToken = storage.read<String>('apns_token');
-  final cachedTimestamp = storage.read<int>('apns_token_timestamp');
-
-  // 如果token存在且未超过30分钟，直接返回缓存的token
+  //if token valid, return cached token
   if (cachedToken != null && cachedTimestamp != null) {
     final tokenAge = DateTime.now().millisecondsSinceEpoch - cachedTimestamp;
     if (tokenAge < 1800000) {
@@ -23,10 +22,10 @@ Future<String> getToken() async {
     }
   }
 
-  // 加载APNs Auth Key (p8文件) 从 assets
-  final String apnsKey = await rootBundle.loadString('assets/key.p8');
+  // get APNs Auth Key from assets
+  final apnsKey = await rootBundle.loadString('assets/key.p8');
 
-  // 生成JWT
+  //generate JWT
   final jwt = JWT(
     {
       'iss': teamId,
@@ -40,28 +39,23 @@ Future<String> getToken() async {
     algorithm: JWTAlgorithm.ES256,
   );
 
-  // 缓存token和生成时间
-  storage.write('apns_token', token);
-  storage.write('apns_token_timestamp', DateTime.now().millisecondsSinceEpoch);
+  // cache token
+  await prefs.setString('apns_token', token);
+  await prefs.setInt(
+      'apns_token_timestamp', DateTime.now().millisecondsSinceEpoch);
 
   return token;
 }
 
-void sendNotification(String title, String body, String icon) async {
-  ConfigController configController = Get.find();
-
-  String deviceToken = configController.config['deviceToken'];
-  String bundleId = 'me.fin.bark';
-
+void sendNotification(
+    String deviceToken, String title, String body, String icon) async {
   final token = await getToken();
 
-  // 创建HTTP/2客户端
   final client = ClientTransportConnection.viaSocket(
     await SecureSocket.connect('api.push.apple.com', 443,
         supportedProtocols: ['h2']),
   );
 
-  // 构建HTTP/2请求头
   final headers = [
     Header.ascii(':method', 'POST'),
     Header.ascii(':path', '/3/device/$deviceToken'),
@@ -70,7 +64,6 @@ void sendNotification(String title, String body, String icon) async {
     Header.ascii('apns-topic', bundleId),
   ];
 
-  // 推送内容
   final data = jsonEncode({
     'aps': {
       'mutable-content': 1,

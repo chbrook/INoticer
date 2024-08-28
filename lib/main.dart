@@ -2,13 +2,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:inoticer/controller/config_controller.dart';
 import 'package:inoticer/language/messages.dart';
 import 'package:inoticer/route/router.dart';
 
 void main() async {
-  await GetStorage.init();
   Get.put(ConfigController());
   runApp(const MyApp());
 }

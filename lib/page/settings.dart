@@ -26,7 +26,8 @@ class Settings extends StatelessWidget {
                       configController.config['deviceToken'] == '') {
                     showToast('ToastTile'.tr, 'Tips1'.tr);
                   } else {
-                    sendNotification('Test', 'This is a test message', '');
+                    sendNotification(configController.config['deviceToken'],
+                        'Test', 'This is a test message', '');
                     showToast('ToastTile'.tr, 'Tips2'.tr);
                   }
                 },

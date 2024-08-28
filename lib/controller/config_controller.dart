@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
@@ -6,7 +7,8 @@ import 'package:get/get.dart';
 import 'package:inoticer/api/api.dart';
 import 'package:inoticer/utils/common.dart';
 import 'package:inoticer/utils/notification.dart';
-import 'package:inoticer/utils/storage.dart';
+import 'package:inoticer/utils/prefs.dart';
+import 'package:installed_apps/app_info.dart';
 import 'package:restart_app/restart_app.dart';
 
 class ConfigController extends GetxController {
@@ -25,28 +27,42 @@ class ConfigController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    var cacheConfig = storage.read('config');
-    var cacheCheckedApps = storage.read('checkedApps');
-    if (cacheConfig != null) {
-      config = RxMap.from(cacheConfig);
+    initData();
+  }
+
+  void initData() async {
+    final String? cacheConfigStr = await prefs.getString('config');
+    final String? cacheCheckedAppsStr = await prefs.getString('checkedApps');
+
+    if (cacheConfigStr != null) {
+      final cacheConfig = jsonDecode(cacheConfigStr);
+      config.assignAll(Map<String, Object>.from(cacheConfig));
+    } else {
+      await prefs.setString('config', jsonEncode(config));
     }
-    if (cacheCheckedApps != null) {
-      checkedApps = RxList.from(cacheCheckedApps);
+
+    if (cacheCheckedAppsStr != null) {
+      final cacheCheckedApps = jsonDecode(cacheCheckedAppsStr);
+      checkedApps.assignAll(cacheCheckedApps);
+    } else {
+      await prefs.setString('checkedApps', jsonEncode(checkedApps));
     }
 
     if (config['openPush']) {
-      ExNotificationListener();
+      ExNotificationListener.initPlatformState();
     }
   }
 
-  void updateCheckedApps(app, bool status) async {
-    bool exist =
+  void updateCheckedApps(AppInfo app, bool status) async {
+    final exist =
         checkedApps.any((element) => element['packageName'] == app.packageName);
 
     if (status && !exist) {
       showLoading('Uploading'.tr);
-      String iconUrl = await Api().uploadIcon(app.icon!);
+
+      final iconUrl = app.icon != null ? await Api().uploadIcon(app.icon!) : '';
       print(iconUrl);
+
       checkedApps.add(
           {'packageName': app.packageName, 'name': app.name, 'icon': iconUrl});
 
@@ -57,13 +73,13 @@ class ConfigController extends GetxController {
     } else {
       return;
     }
-    storage.write('checkedApps', checkedApps);
+    await prefs.setString('checkedApps', jsonEncode(checkedApps));
   }
 
   void removeCheckedApp(app) async {
     checkedApps
         .removeWhere((element) => element['packageName'] == app['packageName']);
-    storage.write('checkedApps', checkedApps);
+    await prefs.setString('checkedApps', jsonEncode(checkedApps));
   }
 
   void updateConfig(String key, dynamic value) async {
@@ -74,13 +90,13 @@ class ConfigController extends GetxController {
       return setOpenPush(key, value);
     }
     config[key] = value;
-    await storage.write('config', config);
+    await prefs.setString('config', jsonEncode(config));
   }
 
   void setOpenPush(key, value) async {
     if (!value) {
       config[key] = value;
-      await storage.write('config', config);
+      await prefs.setString('config', jsonEncode(config));
       NotificationsListener.stopService();
     } else {
       bool? hasPermission = await NotificationsListener.hasPermission;
@@ -88,7 +104,7 @@ class ConfigController extends GetxController {
         NotificationsListener.openPermissionSettings();
       } else {
         config[key] = value;
-        await storage.write('config', config);
+        await prefs.setString('config', jsonEncode(config));
         showModal('Tips4Title'.tr, 'Tips4'.tr, confirmText: 'Tips4Confirm'.tr,
             onConfirm: () {
           Restart.restartApp();
@@ -106,7 +122,7 @@ class ConfigController extends GetxController {
         await query.querySms(kinds: [SmsQueryKind.inbox], start: 0, count: 1);
 
         config[key] = value;
-        storage.write('config', config);
+        await prefs.setString('config', jsonEncode(config));
       }
     }
 
