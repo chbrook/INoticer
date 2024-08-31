@@ -40,6 +40,10 @@ INoticer automatically uploads the app icon to sm.ms, a free image hosting servi
 
 Some systems may push SMS messages repeatedly through third-party apps. To solve this problem, add a blocked word in the settings (for example, fill in "system lag" in MIUI).
 
+### Why use Profile mode?
+
+Flutter's Tree shake optimization will cause the auto-started notification listening service to not work properly and may miss notifications. Profile mode can solve this problem.
+
 ## About
 
 INoticer aims to solve the problem of receiving Android notifications when you have both Android and iOS devices but don't want to carry both. The project is mainly tested on MIUI devices. The source code can be found on GitHub [here](https://github.com/chbrook/INoticer).
